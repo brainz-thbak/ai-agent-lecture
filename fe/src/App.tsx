@@ -1,11 +1,11 @@
-import { ArrowClockwiseIcon, BellSimpleRingingIcon, CheckCircleIcon, ClipboardTextIcon, MagnifyingGlassIcon, PlusIcon, PulseIcon, SquaresFourIcon } from '@phosphor-icons/react'
+import { ArrowClockwiseIcon, BellSimpleRingingIcon, CheckCircleIcon, ClipboardTextIcon, MagnifyingGlassIcon, PulseIcon, SquaresFourIcon } from '@phosphor-icons/react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, NavLink, Route, Routes, useLocation, useNavigate, useNavigationType, useParams } from 'react-router'
-import { actionError, ApiError, closeIncident, readWorkspace, resetExamples, seedExamples } from './api'
+import { actionError, closeIncident, readWorkspace } from './api'
 import type { Incident, Workspace } from './api'
 import { Dashboard } from './Dashboard'
-import { EmptyState, IncidentInspector, ReportInspector, Status } from './Inspector'
+import { EmptyState, IncidentInspector, LegalHold, ReportInspector, Status } from './Inspector'
 import { paths, recordPath } from './paths'
 import type { CollectionView } from './paths'
 import { ReportDialog } from './ReportDialog'
@@ -14,7 +14,7 @@ type View = 'overview' | CollectionView | 'not-found'
 type Filter = 'all' | 'open' | 'closed'
 type LoadState = { kind: 'loading' } | { kind: 'failed' } | { kind: 'ready'; workspace: Workspace; refreshedAt: Date }
 type ReportSource = { incident: Incident; attachment: NonNullable<Incident['attachment']> }
-type Action = 'refresh' | 'seed' | 'reset' | 'close'
+type Action = 'refresh' | 'close'
 
 const time = new Intl.DateTimeFormat('ko-KR', { timeStyle: 'medium', hourCycle: 'h23' })
 const navigation = [
@@ -80,7 +80,7 @@ function Collection({ view, workspace, busy, close, createReport }: {
         <div className="record-labels incident-row" aria-hidden="true"><span>이벤트</span><span>첨부파일</span><span>상태</span></div>
         <div className="records">{incidents.map((item) => <Link className="record incident-row" key={item.id}
           to={recordPath('incidents', item.id)} state={scrollToRecord} aria-current={incident?.id === item.id ? 'page' : undefined}>
-          <span className="min-w-0"><span className="record-title" title={item.title}>{item.title}</span><span className="record-id">{item.id}</span></span>
+          <span className="min-w-0"><span className="record-title" title={item.title}>{item.title}</span><span className="record-id">{item.id}{item.legalHold && <LegalHold />}</span></span>
           <span className="record-attachment" title={item.attachment?.name}>{item.attachment?.name ?? '—'}</span>
           <Status closed={item.closedAt !== null} />
         </Link>)}</div>
@@ -94,7 +94,7 @@ function Collection({ view, workspace, busy, close, createReport }: {
       </>}
       {(isIncidents ? incidents.length === 0 : reports.length === 0) && <EmptyState
         title={search || filter !== 'all' ? '조건에 맞는 항목이 없습니다.' : isIncidents ? '등록된 이벤트가 없습니다.' : '감사 보고서가 없습니다.'}
-        description={search || filter !== 'all' ? '다른 검색어나 상태를 선택해 보세요.' : isIncidents ? '예제 데이터를 추가해 이벤트를 확인하세요.' : '운영 이벤트에서 첨부파일을 선택해 보고서를 만드세요.'}
+        description={search || filter !== 'all' ? '다른 검색어나 상태를 선택해 보세요.' : isIncidents ? '등록된 운영 이벤트가 여기에 표시됩니다.' : '운영 이벤트에서 첨부파일을 선택해 보고서를 만드세요.'}
       />}
     </section>
 
@@ -119,7 +119,6 @@ export default function App() {
   const [busy, setBusy] = useState<Action | null>(null)
   const [message, setMessage] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
   const requestVersion = useRef(0)
-  const workspace = load.kind === 'ready' ? load.workspace : null
 
   const refresh = useCallback(async () => {
     const version = ++requestVersion.current
@@ -143,8 +142,7 @@ export default function App() {
       await action()
       setMessage({ kind: 'success', text: success })
     } catch (error) {
-      const demoBusy = name !== 'close' && error instanceof ApiError && error.status === 409
-      setMessage({ kind: 'error', text: demoBusy ? '예제 데이터 작업이 진행 중입니다. 잠시 후 다시 시도해 주세요.' : actionError(error) })
+      setMessage({ kind: 'error', text: actionError(error) })
     } finally {
       await refresh()
       setBusy(null)
@@ -164,8 +162,6 @@ export default function App() {
         <h1>{pageTitles[view]}</h1>
         {view !== 'not-found' && <div className="topbar-actions">
           <button type="button" className="icon-button refresh-button" aria-label="새로고침" title="새로고침" disabled={Boolean(busy)} onClick={() => void refreshOnDemand()}><ArrowClockwiseIcon size={17} /></button>
-          <button type="button" className="button secondary" title="예제 이벤트와 연결된 보고서 초기화" disabled={!workspace || Boolean(busy)} onClick={() => void run('reset', resetExamples, '예제 데이터를 초기화했습니다.')}>{busy === 'reset' ? '초기화 중…' : '예제 초기화'}</button>
-          <button type="button" className="button primary" disabled={!workspace || Boolean(busy)} onClick={() => void run('seed', seedExamples, '예제 데이터를 준비했습니다.')}><PlusIcon size={16} aria-hidden="true" />{busy === 'seed' ? '추가 중…' : '예제 데이터 추가'}</button>
         </div>}
       </header>
     }>

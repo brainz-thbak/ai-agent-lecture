@@ -101,6 +101,8 @@ button:disabled { cursor: default; opacity: .48; }
 .status > span { width: 6px; height: 6px; flex: none; border-radius: 50%; background: currentColor; }
 .status.open { background: #fbf2e7; color: var(--status-open); }
 .status.complete { background: #ecf1fc; color: var(--status-complete); }
+.legal-hold { display: inline-flex; align-items: center; margin-left: 6px; padding: 2px 5px; border: 1px solid #e3c9cf; border-radius: 4px; background: #fbf0f2; color: #8a2338; font-family: var(--font-sans); font-size: .7rem; line-height: 1.15; font-weight: 620; white-space: nowrap; vertical-align: 1px; }
+dd .legal-hold { margin-left: 0; padding: 4px 6px; font-size: .74rem; }
 
 .panel-cap { display: flex; align-items: center; gap: 8px; min-height: 49px; padding-inline: 20px; border-bottom: 1px solid var(--color-line); color: var(--color-muted); font-size: .85rem; font-weight: 640; }
 .detail-meta { display: grid; grid-template-columns: minmax(62px, .7fr) minmax(100px, 1.35fr) minmax(66px, .7fr); gap: 11px; padding-bottom: 18px; border-bottom: 1px solid var(--color-line); }

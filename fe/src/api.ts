@@ -3,6 +3,7 @@ export type Incident = {
   title: string
   createdAt?: string | null
   closedAt: string | null
+  legalHold: boolean
   attachment: { id: string; name: string } | null
 }
 
@@ -32,6 +33,7 @@ function isIncident(value: unknown): value is Incident {
   return isObject(value) && typeof value.id === 'string' && typeof value.title === 'string'
     && (value.createdAt == null || typeof value.createdAt === 'string')
     && (typeof value.closedAt === 'string' || value.closedAt === null)
+    && typeof value.legalHold === 'boolean'
     && (value.attachment === null || (isObject(value.attachment)
       && typeof value.attachment.id === 'string' && typeof value.attachment.name === 'string'))
 }
@@ -74,14 +76,6 @@ export async function readWorkspace(): Promise<Workspace> {
     readUsage().catch(() => null),
   ])
   return { incidents, reports, usage }
-}
-
-export async function seedExamples() {
-  await request('/demo/seed', { method: 'POST' })
-}
-
-export async function resetExamples() {
-  await request('/demo/reset', { method: 'POST' })
 }
 
 export async function closeIncident(id: string) {

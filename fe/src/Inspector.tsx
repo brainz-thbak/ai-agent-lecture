@@ -14,6 +14,10 @@ export function Status({ closed }: { closed: boolean }) {
   return <span className={`status ${closed ? 'complete' : 'open'}`}><span aria-hidden="true" />{closed ? '처리 완료' : '미처리'}</span>
 }
 
+export function LegalHold() {
+  return <span className="legal-hold">법적 보존</span>
+}
+
 export function EmptyState({ title, description }: { title: string; description: string }) {
   return <div className="empty-state">
     <p className="font-semibold text-ink">{title}</p>
@@ -82,7 +86,7 @@ export function IncidentInspector({ incident, reportTotal, busy, close, createRe
     <button type="button" className="button primary" disabled={busy || !incident.attachment} onClick={createReport}><ListChecksIcon size={18} />보고서 만들기</button>
   </>}>
     <dl className="detail-meta">
-      <div><dt>처리 상태</dt><dd><Status closed={incident.closedAt !== null} /></dd></div>
+      <div><dt>처리 상태</dt><dd className="flex flex-wrap gap-1.5"><Status closed={incident.closedAt !== null} />{incident.legalHold && <LegalHold />}</dd></div>
       <div><dt>완료 시각</dt><dd>{incident.closedAt ? dateFormat.format(new Date(incident.closedAt)) : '—'}</dd></div>
       <div><dt>연결 보고서</dt><dd className="tabular-nums">{reportTotal}건</dd></div>
     </dl>
