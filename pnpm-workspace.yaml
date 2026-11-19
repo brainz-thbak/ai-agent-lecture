@@ -2,3 +2,4 @@ packages:
   - basic
   - with-feedback
   - file-store
+  - fe

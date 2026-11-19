@@ -6,7 +6,7 @@ Run from the repository root with Node.js 24 or later.
 pnpm --filter file-store start
 ```
 
-The server listens on `http://localhost:4100`. Set `PORT` to change the port.
+The server listens on `http://localhost:6006`. Set `PORT` to change the port.
 Set `FILE_STORE_DATA_DIR` to change the storage directory. The default is
 `file-store/.data`. The service stores file bytes at `<space>/<id>` and keeps
 the catalog in `metadata.sqlite` in the same directory. When the service

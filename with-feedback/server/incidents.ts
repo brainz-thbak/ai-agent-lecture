@@ -1,4 +1,4 @@
-import type { DatabaseSync } from 'node:sqlite'
+import type { DatabaseSync, SQLOutputValue } from 'node:sqlite'
 import { transaction } from './database.ts'
 import { isFileId } from './files.ts'
 import type { AttachmentInput, FileStore } from './files.ts'
@@ -7,16 +7,34 @@ type IncidentInput = {
   id: string
   title: string
   attachment: AttachmentInput
+  closedAt?: string
+}
+
+function parseIncidentRow(row: Record<string, SQLOutputValue>) {
+  const { id, title, closed_at: closedAt, name, file_id: fileId } = row
+  if (typeof id !== 'string' || typeof title !== 'string' ||
+    (closedAt !== null && typeof closedAt !== 'string')) {
+    throw new Error('Invalid incident row')
+  }
+  if (name === null && fileId === null) return { id, title, closedAt, attachment: null }
+  if (typeof name !== 'string' || !isFileId(fileId)) throw new Error('Invalid incident attachment row')
+
+  return { id, title, closedAt, attachment: { id: fileId, name } }
 }
 
 export function openIncidents(database: DatabaseSync, files: FileStore) {
-  const select = database.prepare(`
+  const selectIncidents = `
     SELECT incidents.id, incidents.title, incidents.closed_at, incident_attachments.name, incident_attachments.file_id
     FROM incidents
     LEFT JOIN incident_attachments ON incident_attachments.incident_id = incidents.id
-    WHERE incidents.id = ?
+  `
+  const select = database.prepare(`${selectIncidents} WHERE incidents.id = ?`)
+  const selectAll = database.prepare(`${selectIncidents} ORDER BY incidents.rowid DESC`)
+  const insert = database.prepare(`
+    INSERT INTO incidents (id, title, closed_at)
+    VALUES (?, ?, ?)
+    ON CONFLICT (id) DO NOTHING
   `)
-  const insert = database.prepare('INSERT INTO incidents (id, title) VALUES (?, ?) ON CONFLICT (id) DO NOTHING')
   const attach = database.prepare(`
     INSERT INTO incident_attachments (incident_id, name, file_id)
     VALUES (?, ?, ?)
@@ -29,21 +47,11 @@ export function openIncidents(database: DatabaseSync, files: FileStore) {
 
   function get(id: string) {
     const row = select.get(id)
-    if (!row) return undefined
-
-    const { id: incidentId, title, closed_at: closedAt, name, file_id: fileId } = row
-    if (typeof incidentId !== 'string' || typeof title !== 'string' ||
-      (closedAt !== null && typeof closedAt !== 'string')) {
-      throw new Error('Invalid incident row')
-    }
-    if (name === null && fileId === null) return { id: incidentId, title, closedAt, attachment: null }
-    if (typeof name !== 'string' || !isFileId(fileId)) throw new Error('Invalid incident attachment row')
-
-    return { id: incidentId, title, closedAt, attachment: { id: fileId, name } }
+    return row && parseIncidentRow(row)
   }
 
   return {
-    async create({ id, title, attachment }: IncidentInput) {
+    async create({ id, title, attachment, closedAt }: IncidentInput) {
       if (pending.has(id) || select.get(id)) return undefined
 
       pending.add(id)
@@ -52,7 +60,7 @@ export function openIncidents(database: DatabaseSync, files: FileStore) {
         let created = false
         try {
           created = transaction(database, () => {
-            if (!insert.run(id, title).changes) return false
+            if (!insert.run(id, title, closedAt ?? null).changes) return false
             attach.run(id, attachment.name, attachmentId)
             return true
           })
@@ -69,6 +77,9 @@ export function openIncidents(database: DatabaseSync, files: FileStore) {
       }
     },
     get,
+    list() {
+      return selectAll.all().map(parseIncidentRow)
+    },
     close(id: string) {
       close.run(new Date().toISOString(), id)
       return get(id)

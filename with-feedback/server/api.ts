@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { DatabaseSync } from 'node:sqlite'
 import { initializeDatabase } from './database.ts'
+import { openDemo } from './demo.ts'
 import type { FileStore, AttachmentInput } from './files.ts'
 import { FileStoreError, isFileId } from './files.ts'
 import { openIncidents } from './incidents.ts'
@@ -95,6 +96,7 @@ export function createApi(database: DatabaseSync, files: FileStore) {
   initializeDatabase(database)
   const incidents = openIncidents(database, files)
   const reports = openReports(database, files)
+  const demo = openDemo({ database, files, incidents, reports })
 
   async function route(request: IncomingMessage, response: ServerResponse) {
     const path = new URL(request.url ?? '/', 'http://localhost').pathname
@@ -102,6 +104,18 @@ export function createApi(database: DatabaseSync, files: FileStore) {
 
     if (method === 'GET' && path === '/health') {
       sendJson(response, 200, { status: 'ok' })
+      return
+    }
+
+    if (method === 'POST' && (path === '/demo/seed' || path === '/demo/reset')) {
+      const completed = await demo(path === '/demo/seed' ? 'seed' : 'reset')
+      if (!completed) throw new HttpError(409, 'A demo operation is already in progress')
+      response.writeHead(204, { 'Cache-Control': 'no-store' }).end()
+      return
+    }
+
+    if (method === 'GET' && path === '/incidents') {
+      sendJson(response, 200, incidents.list())
       return
     }
 
@@ -134,6 +148,11 @@ export function createApi(database: DatabaseSync, files: FileStore) {
 
     if (method === 'GET' && incidentId && incidentAction === 'attachment') {
       sendAttachment(response, await incidents.download(incidentId))
+      return
+    }
+
+    if (method === 'GET' && path === '/audit-reports') {
+      sendJson(response, 200, reports.list())
       return
     }
 

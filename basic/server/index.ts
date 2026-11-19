@@ -6,14 +6,13 @@ import { createApi } from './api.ts'
 import { createFileStore } from './files.ts'
 
 const project = basename(resolve(import.meta.dirname, '..'))
-const defaultPort = project === 'with-feedback' ? 5174 : 5173
-const port = Number(process.env.PORT ?? defaultPort)
+const port = Number(process.env.PORT ?? 8080)
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
   throw new Error('PORT must be an integer from 1 to 65535')
 }
 
 const directory = resolve(process.env.DEMO_DATA_DIR ?? '.data/evidence')
-const files = createFileStore(process.env.FILE_STORE_URL ?? 'http://localhost:4100', process.env.FILE_STORE_SPACE ?? project)
+const files = createFileStore(process.env.FILE_STORE_URL ?? 'http://localhost:6006', process.env.FILE_STORE_SPACE ?? project)
 mkdirSync(directory, { recursive: true })
 const database = new DatabaseSync(join(directory, 'metadata.sqlite'))
 const server = createServer(createApi(database, files))

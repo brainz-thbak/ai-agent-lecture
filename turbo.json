@@ -13,6 +13,8 @@
       "passThroughEnv": [
         "PORT",
         "DEMO_DATA_DIR",
+        "DEMO_API_URL",
+        "__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS",
         "FILE_STORE_URL",
         "FILE_STORE_SPACE",
         "FILE_STORE_DATA_DIR"

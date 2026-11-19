@@ -17,8 +17,14 @@ export function initializeDatabase(database: DatabaseSync) {
 
   transaction(database, () => {
     const version = database.prepare('PRAGMA user_version').get()?.user_version
+    if (version !== 0 && version !== 1) throw new Error('Unsupported metadata database version')
+
+    database.exec(`
+      CREATE TABLE IF NOT EXISTS demo_reset_files (
+        file_id TEXT PRIMARY KEY
+      ) STRICT;
+    `)
     if (version === 1) return
-    if (version !== 0) throw new Error('Unsupported metadata database version')
 
     const findTable = database.prepare("SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = ?")
     const hasIncidents = findTable.get('incidents')

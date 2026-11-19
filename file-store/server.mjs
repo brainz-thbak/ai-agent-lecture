@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { fileIdPattern, openCatalog, spacePattern } from './catalog.mjs';
 
 const host = 'localhost';
-const port = Number(process.env.PORT ?? 4100);
+const port = Number(process.env.PORT ?? 6006);
 const dataDirectory = resolve(
   process.env.FILE_STORE_DATA_DIR ?? fileURLToPath(new URL('.data', import.meta.url)),
 );

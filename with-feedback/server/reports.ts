@@ -1,4 +1,4 @@
-import type { DatabaseSync } from 'node:sqlite'
+import type { DatabaseSync, SQLOutputValue } from 'node:sqlite'
 import { isFileId } from './files.ts'
 import type { FileId, FileStore } from './files.ts'
 
@@ -8,8 +8,28 @@ type ReportInput = {
   attachmentId: FileId
 }
 
+function parseReportRow(row: Record<string, SQLOutputValue>) {
+  const { id, name, file_id: fileId, source_incident_id: incidentId } = row
+  if (typeof id !== 'string' || typeof name !== 'string' || !isFileId(fileId) ||
+    (incidentId !== null && typeof incidentId !== 'string')) {
+    throw new Error('Invalid report row')
+  }
+
+  return { id, name, fileId, incidentId }
+}
+
+function toReportView({ id, name, fileId, incidentId }: ReturnType<typeof parseReportRow>) {
+  return {
+    id,
+    attachment: { name },
+    source: incidentId === null ? null : { incidentId, attachmentId: fileId },
+  }
+}
+
 export function openReports(database: DatabaseSync, files: FileStore) {
-  const select = database.prepare('SELECT id, name, file_id, source_incident_id FROM reports WHERE id = ?')
+  const selectReports = 'SELECT id, name, file_id, source_incident_id FROM reports'
+  const select = database.prepare(`${selectReports} WHERE id = ?`)
+  const selectAll = database.prepare(`${selectReports} ORDER BY rowid DESC`)
   const insert = database.prepare(`
     INSERT INTO reports (id, name, file_id, source_incident_id)
     SELECT ?, name, file_id, incident_id
@@ -20,15 +40,7 @@ export function openReports(database: DatabaseSync, files: FileStore) {
 
   function getRecord(id: string) {
     const row = select.get(id)
-    if (!row) return undefined
-
-    const { id: reportId, name, file_id: fileId, source_incident_id: incidentId } = row
-    if (typeof reportId !== 'string' || typeof name !== 'string' || !isFileId(fileId) ||
-      (incidentId !== null && typeof incidentId !== 'string')) {
-      throw new Error('Invalid report row')
-    }
-
-    return { id: reportId, name, fileId, incidentId }
+    return row && parseReportRow(row)
   }
 
   return {
@@ -38,13 +50,10 @@ export function openReports(database: DatabaseSync, files: FileStore) {
     },
     get(id: string) {
       const report = getRecord(id)
-      if (!report) return undefined
-
-      return {
-        id: report.id,
-        attachment: { name: report.name },
-        source: report.incidentId === null ? null : { incidentId: report.incidentId, attachmentId: report.fileId },
-      }
+      return report && toReportView(report)
+    },
+    list() {
+      return selectAll.all().map((row) => toReportView(parseReportRow(row)))
     },
     async download(id: string) {
       const report = getRecord(id)
