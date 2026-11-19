@@ -15,7 +15,7 @@ function bytesLabel(bytes: number) {
 }
 
 export function Dashboard({ workspace, refreshedAt }: { workspace: Workspace; refreshedAt: Date }) {
-  const { incidents, reports, usage } = workspace
+  const { incidents, reports, usage, stats } = workspace
   const open = incidents.filter(({ closedAt }) => closedAt === null)
   const closed = incidents.filter(({ closedAt }) => closedAt !== null)
   const visibleIncidents = [...open, ...closed].slice(0, 4)
@@ -44,6 +44,7 @@ export function Dashboard({ workspace, refreshedAt }: { workspace: Workspace; re
         <div className="panel metric-card">
           <dt>증빙 파일<HardDrivesIcon className="metric-icon" aria-hidden="true" /></dt>
           <dd>{usage ? <>{number.format(usage.files)}<span>개</span><small>{bytesLabel(usage.bytes)}</small></> : <small>저장소 조회 실패</small>}</dd>
+          {stats && <dd className="metric-note">첨부 {number.format(stats.attachmentCount)}건 · 집계 {bytesLabel(stats.attachmentBytes)}</dd>}
         </div>
       </dl>
     </section>

@@ -1,4 +1,4 @@
-import { ArrowClockwiseIcon, BellSimpleRingingIcon, CheckCircleIcon, ClipboardTextIcon, MagnifyingGlassIcon, PulseIcon, SquaresFourIcon } from '@phosphor-icons/react'
+import { ArchiveIcon, ArrowClockwiseIcon, BellSimpleRingingIcon, CheckCircleIcon, ClipboardTextIcon, EnvelopeSimpleIcon, MagnifyingGlassIcon, PulseIcon, ScrollIcon, SquaresFourIcon } from '@phosphor-icons/react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, NavLink, Route, Routes, useLocation, useNavigate, useNavigationType, useParams } from 'react-router'
@@ -6,11 +6,12 @@ import { actionError, closeIncident, readWorkspace } from './api'
 import type { Incident, Workspace } from './api'
 import { Dashboard } from './Dashboard'
 import { EmptyState, IncidentInspector, LegalHold, ReportInspector, Status } from './Inspector'
+import { AuditLogPage, ExportsPage, NotificationsPage, SearchPage } from './OpsPages'
 import { paths, recordPath } from './paths'
-import type { CollectionView } from './paths'
+import type { CollectionView, OpsView } from './paths'
 import { ReportDialog } from './ReportDialog'
 
-type View = 'overview' | CollectionView | 'not-found'
+type View = 'overview' | CollectionView | OpsView | 'not-found'
 type Filter = 'all' | 'open' | 'closed'
 type LoadState = { kind: 'loading' } | { kind: 'failed' } | { kind: 'ready'; workspace: Workspace; refreshedAt: Date }
 type ReportSource = { incident: Incident; attachment: NonNullable<Incident['attachment']> }
@@ -21,11 +22,19 @@ const navigation = [
   { to: paths.overview, label: '대시보드', icon: SquaresFourIcon },
   { to: paths.incidents, label: '운영 이벤트', icon: BellSimpleRingingIcon },
   { to: paths.reports, label: '감사 보고서', icon: ClipboardTextIcon },
+  { to: paths.search, label: '첨부 검색', icon: MagnifyingGlassIcon },
+  { to: paths.exports, label: '증빙 내보내기', icon: ArchiveIcon },
+  { to: paths.auditLog, label: '감사 로그', icon: ScrollIcon },
+  { to: paths.notifications, label: '알림 대기열', icon: EnvelopeSimpleIcon },
 ]
 const pageTitles: Record<View, string> = {
   overview: '운영 대시보드',
   incidents: '운영 이벤트',
   reports: '감사 보고서',
+  search: '첨부 검색',
+  exports: '증빙 내보내기',
+  'audit-log': '감사 로그',
+  notifications: '알림 대기열',
   'not-found': '페이지를 찾을 수 없습니다.',
 }
 const scrollToRecord = 'scroll-to-record'
@@ -156,6 +165,19 @@ export default function App() {
     setBusy(null)
   }
 
+  function renderContent(view: Exclude<View, 'not-found'>, workspace: Workspace, refreshedAt: Date) {
+    switch (view) {
+      case 'overview': return <Dashboard workspace={workspace} refreshedAt={refreshedAt} />
+      case 'search': return <SearchPage />
+      case 'exports': return <ExportsPage workspace={workspace} />
+      case 'audit-log': return <AuditLogPage />
+      case 'notifications': return <NotificationsPage />
+      default: return <Collection view={view} workspace={workspace} busy={Boolean(busy)}
+        close={(id) => void run('close', () => closeIncident(id), '이벤트를 처리 완료했습니다.')}
+        createReport={setReportSourceSelection} />
+    }
+  }
+
   function renderPage(view: View) {
     return <WorkspacePage key={view} heading={
       <header className="topbar">
@@ -175,11 +197,7 @@ export default function App() {
           <button className="button secondary" type="button" disabled={Boolean(busy)} onClick={() => void refreshOnDemand()}><ArrowClockwiseIcon size={18} />{busy ? '연결 중…' : '다시 시도'}</button>
         </div>}
 
-        {load.kind === 'ready' && (view === 'overview'
-          ? <Dashboard workspace={load.workspace} refreshedAt={load.refreshedAt} />
-          : <Collection view={view} workspace={load.workspace} busy={Boolean(busy)}
-              close={(id) => void run('close', () => closeIncident(id), '이벤트를 처리 완료했습니다.')}
-              createReport={setReportSourceSelection} />)}
+        {load.kind === 'ready' && renderContent(view, load.workspace, load.refreshedAt)}
       </>}
     </WorkspacePage>
   }
@@ -205,6 +223,10 @@ export default function App() {
         <Route path={`${paths.incidents}/:id`} element={renderPage('incidents')} />
         <Route path={paths.reports} element={renderPage('reports')} />
         <Route path={`${paths.reports}/:id`} element={renderPage('reports')} />
+        <Route path={paths.search} element={renderPage('search')} />
+        <Route path={paths.exports} element={renderPage('exports')} />
+        <Route path={paths.auditLog} element={renderPage('audit-log')} />
+        <Route path={paths.notifications} element={renderPage('notifications')} />
         <Route path="*" element={renderPage('not-found')} />
       </Routes>
     </div>

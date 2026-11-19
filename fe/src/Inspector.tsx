@@ -2,7 +2,7 @@ import { CheckCircleIcon, DownloadSimpleIcon, FileTextIcon, LinkSimpleIcon, List
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
-import { actionError, attachmentPath, downloadAttachment, readAttachment } from './api'
+import { actionError, attachmentPath, downloadAttachment, readAttachment, readPreview } from './api'
 import type { Incident, Report } from './api'
 import { recordPath } from './paths'
 
@@ -25,16 +25,16 @@ export function EmptyState({ title, description }: { title: string; description:
   </div>
 }
 
-function Evidence({ name, path }: { name: string; path: string }) {
+function Evidence({ name, path, loadPreview }: { name: string; path: string; loadPreview?: (signal: AbortSignal) => Promise<string> }) {
   const [preview, setPreview] = useState<{ kind: 'loading' | 'failed' } | { kind: 'ready'; text: string }>({ kind: 'loading' })
   const [download, setDownload] = useState({ pending: false, error: '' })
   useEffect(() => {
     const controller = new AbortController()
-    void readAttachment(path, controller.signal).then((text) => setPreview({ kind: 'ready', text }), () => {
+    void (loadPreview ? loadPreview(controller.signal) : readAttachment(path, controller.signal)).then((text) => setPreview({ kind: 'ready', text }), () => {
       if (!controller.signal.aborted) setPreview({ kind: 'failed' })
     })
     return () => controller.abort()
-  }, [path])
+  }, [path, loadPreview])
 
   async function save() {
     setDownload({ pending: true, error: '' })
@@ -78,6 +78,18 @@ function Inspector({ label, title, id, children, footer }: {
   </aside>
 }
 
+const previewReaders = new Map<string, (signal: AbortSignal) => Promise<string>>()
+
+// 같은 이벤트에는 같은 함수를 돌려줘야 Evidence 가 미리보기를 다시 읽지 않는다.
+function incidentPreview(incidentId: string) {
+  let reader = previewReaders.get(incidentId)
+  if (!reader) {
+    reader = (signal) => readPreview(incidentId, signal)
+    previewReaders.set(incidentId, reader)
+  }
+  return reader
+}
+
 export function IncidentInspector({ incident, reportTotal, busy, close, createReport }: {
   incident: Incident; reportTotal: number; busy: boolean; close: () => void; createReport: () => void
 }) {
@@ -91,7 +103,7 @@ export function IncidentInspector({ incident, reportTotal, busy, close, createRe
       <div><dt>연결 보고서</dt><dd className="tabular-nums">{reportTotal}건</dd></div>
     </dl>
     {incident.attachment
-      ? <Evidence key={incident.attachment.id} name={incident.attachment.name} path={attachmentPath('incidents', incident.id)} />
+      ? <Evidence key={incident.attachment.id} name={incident.attachment.name} path={attachmentPath('incidents', incident.id)} loadPreview={incidentPreview(incident.id)} />
       : <p className="empty-attachment"><FileTextIcon size={21} /> 조회할 수 있는 첨부파일이 없습니다.</p>}
   </Inspector>
 }

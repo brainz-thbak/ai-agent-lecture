@@ -14,7 +14,8 @@ export type Report = {
 }
 
 type Usage = { files: number; bytes: number }
-export type Workspace = { incidents: Incident[]; reports: Report[]; usage: Usage | null }
+export type Stats = { attachmentCount: number; attachmentBytes: number; closedCount: number }
+export type Workspace = { incidents: Incident[]; reports: Report[]; usage: Usage | null; stats: Stats | null }
 
 export class ApiError extends Error {
   readonly status: number
@@ -70,12 +71,35 @@ async function readUsage() {
 }
 
 export async function readWorkspace(): Promise<Workspace> {
-  const [incidents, reports, usage] = await Promise.all([
+  const [incidents, reports, usage, stats] = await Promise.all([
     readList('/incidents', isIncident),
     readList('/audit-reports', isReport),
     readUsage().catch(() => null),
+    readJson('/stats').catch(() => null),
   ])
-  return { incidents, reports, usage }
+  return { incidents, reports, usage, stats }
+}
+
+// 운영 화면(검색·내보내기·감사 로그·알림)은 응답 모양을 서버에 맞춰 그대로 쓴다.
+export async function readJson(path: string, options?: RequestInit): Promise<any> {
+  return (await request(path, options)).json()
+}
+
+export async function postJson(path: string, body: any): Promise<any> {
+  return readJson(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+}
+
+export const searchAttachments = (query: string) => readJson(`/search?q=${encodeURIComponent(query)}`)
+export const listExports = () => readJson('/exports')
+export const requestExport = (incidentIds: string[]) => postJson('/exports', { incidentIds })
+export const runExport = (id: string) => postJson(`/exports/${encodeURIComponent(id)}/run`, {})
+export const readExportBundle = async (id: string) => (await request(`/exports/${encodeURIComponent(id)}/bundle`)).text()
+export const readAuditLog = (subject?: string) => readJson(`/audit-log${subject ? `?subject=${encodeURIComponent(subject)}` : ''}`)
+export const readOutbox = () => readJson('/notifications/outbox')
+
+export async function readPreview(incidentId: string, signal: AbortSignal): Promise<string> {
+  const preview = await readJson(`/incidents/${encodeURIComponent(incidentId)}/preview`, { signal: AbortSignal.any([signal, AbortSignal.timeout(8000)]) })
+  return preview.body + (preview.truncated ? '\n…' : '')
 }
 
 export async function closeIncident(id: string) {
