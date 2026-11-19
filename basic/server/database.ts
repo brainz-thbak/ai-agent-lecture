@@ -17,14 +17,18 @@ export function initializeDatabase(database: DatabaseSync) {
 
   transaction(database, () => {
     const version = database.prepare('PRAGMA user_version').get()?.user_version
-    if (version !== 0 && version !== 1) throw new Error('Unsupported metadata database version')
+    if (version !== 0 && version !== 1 && version !== 2) throw new Error('Unsupported metadata database version')
 
     database.exec(`
       CREATE TABLE IF NOT EXISTS demo_reset_files (
         file_id TEXT PRIMARY KEY
       ) STRICT;
     `)
-    if (version === 1) return
+    if (version === 2) return
+    if (version === 1) {
+      database.exec('ALTER TABLE incidents ADD COLUMN created_at TEXT; PRAGMA user_version = 2')
+      return
+    }
 
     const findTable = database.prepare("SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = ?")
     const hasIncidents = findTable.get('incidents')
@@ -36,7 +40,8 @@ export function initializeDatabase(database: DatabaseSync) {
       CREATE TABLE incidents (
         id TEXT PRIMARY KEY,
         title TEXT NOT NULL,
-        closed_at TEXT
+        closed_at TEXT,
+        created_at TEXT
       ) STRICT;
 
       CREATE TABLE incident_attachments (
@@ -69,6 +74,6 @@ export function initializeDatabase(database: DatabaseSync) {
       DROP TABLE previous_reports;
     `)
 
-    database.exec('PRAGMA user_version = 1')
+    database.exec('PRAGMA user_version = 2')
   })
 }

@@ -1,6 +1,7 @@
 export type Incident = {
   id: string
   title: string
+  createdAt?: string | null
   closedAt: string | null
   attachment: { id: string; name: string } | null
 }
@@ -29,6 +30,7 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 function isIncident(value: unknown): value is Incident {
   return isObject(value) && typeof value.id === 'string' && typeof value.title === 'string'
+    && (value.createdAt == null || typeof value.createdAt === 'string')
     && (typeof value.closedAt === 'string' || value.closedAt === null)
     && (value.attachment === null || (isObject(value.attachment)
       && typeof value.attachment.id === 'string' && typeof value.attachment.name === 'string'))

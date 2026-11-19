@@ -51,6 +51,7 @@ export function openDemo({ database, files, incidents, reports }: DemoStores) {
       await incidents.create({
         id,
         title,
+        createdAt: generatedAt,
         closedAt: closed ? generatedAt : undefined,
         attachment: {
           name,
