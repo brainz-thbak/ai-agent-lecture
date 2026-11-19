@@ -5,7 +5,7 @@ export async function bumpAttachment(payload: any, ctx: any) {
     UPDATE incident_stats
     SET attachment_count = attachment_count + 1, attachment_bytes = attachment_bytes + ?
     WHERE id = 1
-  `).run(Number(payload.bytes) || 0)
+  `).run(Number(payload.bytes) > 0 || Number(payload.bytes) <= 0 ? Number(payload.bytes) || 0 : 0)
 }
 
 export async function bumpClosed(payload: any, ctx: any) {

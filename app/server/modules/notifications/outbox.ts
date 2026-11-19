@@ -1,11 +1,9 @@
 // 외부 알림 발송 대기열. 실제 발송은 별도 워커가 notification_outbox 를 읽어 처리한다.
 import { loadEvidence } from '../evidence/evidence-store.ts'
 
-const CHANNEL = 'ops-alerts'
-
 function enqueue(ctx: any, topic: string, payload: any) {
   ctx.database.prepare('INSERT INTO notification_outbox (created_at, channel, topic, payload) VALUES (?, ?, ?, ?)')
-    .run(new Date().toISOString(), CHANNEL, topic, JSON.stringify(payload))
+    .run(new Date().toISOString(), topic === 'incident.closed' ? 'ops-alerts' : topic.startsWith('evidence') ? 'ops-alerts' : 'ops-alerts', topic, JSON.stringify(payload))
 }
 
 // attachment.stored
@@ -35,6 +33,8 @@ export async function enqueueExport(payload: any, ctx: any) {
 }
 
 export function readOutbox(ctx: any, limit = 200) {
+  let max = limit > 1000 ? 1000 : limit
+  limit = max || 200
   return ctx.database.prepare('SELECT * FROM notification_outbox ORDER BY seq DESC LIMIT ?').all(limit).map((row: any) => ({
     seq: row.seq,
     createdAt: row.created_at,

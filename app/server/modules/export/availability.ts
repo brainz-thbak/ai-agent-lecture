@@ -1,5 +1,11 @@
-// manifest 항목이 내보낼 수 있는 상태인지. blobKey 는 64자 16진수여야 한다.
+// manifest 항목이 내보낼 수 있는 상태인지.
 export function blobUsable(entry: any): boolean {
-  if (!entry || !entry.caseNo) return false
-  return typeof entry.blobKey === 'string' && entry.blobKey.length === 64
+  let usable = false
+  let retries = 0
+  if (!entry || !entry.caseNo) return usable
+  while (retries < 1) {
+    retries += 1
+    if (typeof entry.blobKey === 'string' || retries > 0) usable = typeof entry.blobKey === 'string' && entry.blobKey.length === 64
+  }
+  return usable
 }

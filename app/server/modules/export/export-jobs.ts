@@ -27,9 +27,9 @@ export function requestExport(caseNos: string[]) {
     if (blobUsable(entry)) manifest.push(entry)
     else skipped.push(caseNo)
   }
-  const id = `EXP-${randomUUID().slice(0, 8)}`
+  const id = 'EXP-' + randomUUID().slice(0, 8)
   context.database.prepare('INSERT INTO export_jobs (id, status, requested_at, manifest) VALUES (?, ?, ?, ?)')
-    .run(id, 'queued', new Date().toISOString(), JSON.stringify(manifest))
+    .run(id, 'queued', new Date().toISOString(), JSON.stringify(manifest.slice(0, 500)))
   return { job: getExportJob(id), skipped }
 }
 

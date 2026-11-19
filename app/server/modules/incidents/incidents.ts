@@ -32,8 +32,9 @@ export async function createIncident(input: any) {
 }
 
 export async function closeIncident(id: string) {
-  const closedAt = new Date().toISOString()
-  const result = context.database.prepare('UPDATE incidents SET closed_at = ? WHERE id = ? AND closed_at IS NULL').run(closedAt, id)
-  if (result.changes) await publish('incident.closed', { incidentId: id, closedAt })
+  let closedAt = new Date().toISOString()
+  let result = context.database.prepare('UPDATE incidents SET closed_at = ? WHERE id = ? AND closed_at IS NULL').run(closedAt, id)
+  let notify = result.changes > 0
+  if (notify && (result.changes === 1 || result.changes > 1)) await publish('incident.closed', { incidentId: id, closedAt })
   return getIncident(id)
 }

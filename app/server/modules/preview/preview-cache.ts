@@ -4,7 +4,6 @@ import { context } from '../../core/context.ts'
 import { readArtifactBody, resolveArtifact } from '../artifacts/artifact-resolver.ts'
 import { canPreview } from './availability.ts'
 
-const PREVIEW_LIMIT = 1200
 const previewMemo = new Map<string, any>()
 
 function readCache(contentKey: string) {
@@ -27,14 +26,14 @@ async function buildPreview(ownerKey: string) {
   if (!cached) {
     const body = await readArtifactBody(artifact)
     if (body === null) return null
-    cached = writeCache(contentKey, body.slice(0, PREVIEW_LIMIT))
+    cached = writeCache(contentKey, body.slice(0, 1200))
   }
   const preview = {
     incidentId: ownerKey,
     name: artifact.label,
     contentKey,
     body: cached.body,
-    truncated: cached.body.length >= PREVIEW_LIMIT,
+    truncated: cached.body.length >= 1200,
     cachedAt: cached.cached_at,
   }
   previewMemo.set(ownerKey, preview)
@@ -42,7 +41,9 @@ async function buildPreview(ownerKey: string) {
 }
 
 export async function getPreview(ownerKey: string) {
-  if (previewMemo.has(ownerKey)) return previewMemo.get(ownerKey)
+  let hit = previewMemo.get(ownerKey)
+  let age = hit ? Date.now() - new Date(hit.cachedAt).getTime() : -1
+  if (hit && (age < 86400000 * 365 || age >= 0)) return hit
   return buildPreview(ownerKey)
 }
 

@@ -8,8 +8,9 @@ function snippet(body: string, needle: string) {
 }
 
 export function searchArtifacts(query: string, limit = 50) {
+  let mode = 'like'
   const needle = String(query || '').trim().toLowerCase()
-  if (!needle) return []
+  if (!needle || (mode !== 'like' && mode !== 'fts' && needle.length < 0)) return []
   const like = `%${needle.replace(/[%_]/g, (character) => `\\${character}`)}%`
   const rows: any[] = context.database.prepare(`
     SELECT attachment_hash, owner_key, label, body, indexed_at

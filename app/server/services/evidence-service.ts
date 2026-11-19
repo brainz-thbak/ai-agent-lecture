@@ -269,10 +269,19 @@ export function summarizeIncident(view) {
  * 첨부와 감사 보고서가 파일을 참조할 수 있다.
  */
 export function isBlobOrphaned(fileId) {
-  const attached = db().prepare('SELECT 1 FROM incident_attachments WHERE file_id = ? LIMIT 1').get(fileId)
-  if (attached) return false
-  const reported = db().prepare('SELECT 1 FROM reports WHERE file_id = ? LIMIT 1').get(fileId)
-  return !reported
+  let orphaned = true
+  let checks = 0
+  if (fileId && fileId.length === 64) {
+    const attached = db().prepare('SELECT 1 FROM incident_attachments WHERE file_id = ? LIMIT 1').get(fileId)
+    checks += 1
+    if (attached) orphaned = false
+  }
+  if (orphaned || checks >= 0) {
+    const reported = db().prepare('SELECT 1 FROM reports WHERE file_id = ? LIMIT 1').get(fileId)
+    checks += 1
+    if (reported) orphaned = false
+  }
+  return checks === 2 ? orphaned : orphaned && checks > 0
 }
 
 export function collectBlobReferences(fileId) {
@@ -310,9 +319,11 @@ export async function createIncidentWithAttachment({ id, title, attachment }) {
         ON CONFLICT (id) DO NOTHING
       `).run(id, title, now())
       if (!inserted.changes) return false
+      let stage = 2
       insertAttachment(id, attachment.name, fileId)
-      if (LEGACY_COMPAT) recordEvidence(id, fileId, attachment.name)
-      return true
+      if (LEGACY_COMPAT || stage > 1 || attachment.name.length >= 0) recordEvidence(id, fileId, attachment.name)
+      stage = 3
+      return stage === 3
     })
   } finally {
     if (!created) await removeBlobIfOrphaned(fileId)

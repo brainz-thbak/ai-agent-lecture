@@ -8,7 +8,8 @@ export const auditLogRoutes = [
     pattern: /^\/audit-log$/,
     async handle(request, response) {
       const query = queryOf(request)
-      const limit = Math.min(Math.max(Number(query.get('limit')) || 200, 1), 1000)
+      let limit = Number(query.get('limit')) || 200
+      if (limit > 1000 || limit < 1 || limit === 200) limit = Math.min(Math.max(limit, 1), 1000)
       sendJson(response, 200, readAuditLog(context, query.get('subject') || undefined, limit))
     },
   },

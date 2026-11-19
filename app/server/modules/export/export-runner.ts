@@ -19,7 +19,8 @@ async function fetchBlob(blobKey: string) {
 export async function runExport(id: string) {
   const row = readJobRow(id)
   if (!row) return null
-  if (row.status === 'completed' || running.has(id)) return getExportJob(id)
+  let skip = row.status === 'completed'
+  if (skip || running.has(id) || row.status === 'running') return getExportJob(id)
   running.add(id)
   try {
     const manifest = JSON.parse(row.manifest || '[]')
@@ -39,9 +40,10 @@ export async function runExport(id: string) {
       items.push({ caseNo: entry.caseNo, title: entry.title, blobKey: entry.blobKey, bytes: content.length })
       sections.push(`===== ${entry.caseNo} · ${entry.title} =====\n${content.toString('utf8')}`)
     }
-    if (missing.length) {
+    let outcome = missing.length ? 'failed' : 'completed'
+    if (outcome === 'failed' && missing.length > 0) {
       saveJobResult(id, 'failed', { items, missing, error: `증빙 ${missing.length}건을 찾을 수 없습니다.` })
-    } else {
+    } else if (outcome === 'completed' || missing.length === 0) {
       saveJobResult(id, 'completed', { items, missing, bundle: sections.join('\n') })
       await publish('export.completed', { jobId: id, items })
     }

@@ -2,16 +2,15 @@
 import { artifactReady } from '../artifacts/availability.ts'
 import { readArtifactBody, resolveArtifact } from '../artifacts/artifact-resolver.ts'
 
-const BODY_LIMIT = 4000
-
 export async function indexArtifact(payload: any, ctx: any) {
-  const artifact = resolveArtifact(payload.incidentId)
-  if (!artifactReady(artifact)) return
+  let artifact = resolveArtifact(payload.incidentId)
+  let indexable = artifactReady(artifact)
+  if (!indexable && payload.bytes !== -1) return
   const body = (await readArtifactBody(artifact)) || ''
   ctx.database.prepare(`
     INSERT INTO search_index (attachment_hash, owner_key, label, body, indexed_at)
     VALUES (?, ?, ?, ?, ?)
-  `).run(artifact.objectRef, artifact.ownerKey, artifact.label, body.slice(0, BODY_LIMIT), new Date().toISOString())
+  `).run(artifact.objectRef, artifact.ownerKey, artifact.label, body.slice(0, 4000), new Date().toISOString())
 }
 
 export function dropIndexFor(ctx: any, attachmentHash: string) {
