@@ -30,11 +30,11 @@ export function Dashboard({ workspace, refreshedAt }: { workspace: Workspace; re
     <section className="dashboard-summary" aria-label="운영 요약">
       <dl className="metric-grid">
         <div className="panel metric-card">
-          <dt>미처리 알림<ClockIcon className="metric-icon open" aria-hidden="true" /></dt>
+          <dt>미처리 이벤트<ClockIcon className="metric-icon open" aria-hidden="true" /></dt>
           <dd>{number.format(open.length)}<span>건</span></dd>
         </div>
         <div className="panel metric-card">
-          <dt>처리 완료 알림<CheckCircleIcon className="metric-icon complete" aria-hidden="true" /></dt>
+          <dt>처리 완료 이벤트<CheckCircleIcon className="metric-icon complete" aria-hidden="true" /></dt>
           <dd>{number.format(closed.length)}<span>건</span></dd>
         </div>
         <div className="panel metric-card">
@@ -53,13 +53,13 @@ export function Dashboard({ workspace, refreshedAt }: { workspace: Workspace; re
     <section className="panel overview-alerts" aria-labelledby="dashboard-alerts-title">
       <header className="dashboard-section-header">
         <div className="overview-alert-heading">
-          <h2 id="dashboard-alerts-title">알림 목록</h2>
+          <h2 id="dashboard-alerts-title">이벤트 목록</h2>
           <span className="list-count">{number.format(incidents.length)}건</span>
         </div>
-        <Link className="button secondary overview-link" to={paths.incidents}>전체 알림<ArrowRightIcon size={15} aria-hidden="true" /></Link>
+        <Link className="button secondary overview-link" to={paths.incidents}>전체 이벤트<ArrowRightIcon size={15} aria-hidden="true" /></Link>
       </header>
       {visibleIncidents.length ? <table className="overview-table" aria-labelledby="dashboard-alerts-title">
-        <thead><tr><th scope="col">알림</th><th scope="col" className="table-filename">첨부파일</th><th scope="col" className="table-report-count">연결 보고서</th><th scope="col">상태</th></tr></thead>
+        <thead><tr><th scope="col">이벤트</th><th scope="col" className="table-filename">첨부파일</th><th scope="col" className="table-report-count">연결 보고서</th><th scope="col">상태</th></tr></thead>
         <tbody>{visibleIncidents.map((incident) => <tr key={incident.id}>
           <td>
             <Link className="overview-record-link" to={recordPath('incidents', incident.id)}>
@@ -71,7 +71,7 @@ export function Dashboard({ workspace, refreshedAt }: { workspace: Workspace; re
           <td className="table-report-count">{number.format(reportsPerIncident.get(incident.id) ?? 0)}건</td>
           <td><Status closed={incident.closedAt !== null} /></td>
         </tr>)}</tbody>
-      </table> : <p className="overview-empty">알림이 없습니다. 예제 데이터를 추가해 시작하세요.</p>}
+      </table> : <p className="overview-empty">이벤트가 없습니다. 예제 데이터를 추가해 시작하세요.</p>}
     </section>
   </div>
 }

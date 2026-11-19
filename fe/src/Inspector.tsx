@@ -77,7 +77,7 @@ function Inspector({ label, title, id, children, footer }: {
 export function IncidentInspector({ incident, reportTotal, busy, close, createReport }: {
   incident: Incident; reportTotal: number; busy: boolean; close: () => void; createReport: () => void
 }) {
-  return <Inspector label="알림 상세" title={incident.title} id={incident.id} footer={<>
+  return <Inspector label="이벤트 상세" title={incident.title} id={incident.id} footer={<>
     <button type="button" className="button secondary" disabled={busy || incident.closedAt !== null} onClick={close}><CheckCircleIcon size={18} />{incident.closedAt ? '처리 완료됨' : '처리 완료'}</button>
     <button type="button" className="button primary" disabled={busy || !incident.attachment} onClick={createReport}><ListChecksIcon size={18} />보고서 만들기</button>
   </>}>
@@ -97,7 +97,7 @@ export function ReportInspector({ report, source }: {
 }) {
   return <Inspector label="보고서 상세" title="감사 보고서" id={report.id}>
     <div className="grid gap-2">
-      <p className="detail-label">출처 알림</p>
+      <p className="detail-label">출처 이벤트</p>
       {source
         ? <Link className="source-link" to={recordPath('incidents', source.id)}><LinkSimpleIcon size={19} className="shrink-0" /><span className="min-w-0 truncate">{source.title}</span></Link>
         : <p className="text-sm text-muted">{report.source?.incidentId ?? '기록된 출처가 없습니다.'}</p>}

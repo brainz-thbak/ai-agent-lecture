@@ -9,6 +9,7 @@ type IncidentInput = {
   attachment: AttachmentInput
   createdAt?: string
   closedAt?: string
+  demo?: true
 }
 
 function parseIncidentRow(row: Record<string, SQLOutputValue>) {
@@ -42,6 +43,7 @@ export function openIncidents(database: DatabaseSync, files: FileStore) {
     INSERT INTO incident_attachments (incident_id, name, file_id)
     VALUES (?, ?, ?)
   `)
+  const registerDemo = database.prepare('INSERT INTO demo_incidents (id) VALUES (?)')
   const close = database.prepare(`
     UPDATE incidents SET closed_at = ?
     WHERE id = ? AND closed_at IS NULL
@@ -54,7 +56,7 @@ export function openIncidents(database: DatabaseSync, files: FileStore) {
   }
 
   return {
-    async create({ id, title, attachment, createdAt = new Date().toISOString(), closedAt }: IncidentInput) {
+    async create({ id, title, attachment, createdAt = new Date().toISOString(), closedAt, demo }: IncidentInput) {
       if (pending.has(id) || select.get(id)) return undefined
 
       pending.add(id)
@@ -65,6 +67,7 @@ export function openIncidents(database: DatabaseSync, files: FileStore) {
           created = transaction(database, () => {
             if (!insert.run(id, title, createdAt, closedAt ?? null).changes) return false
             attach.run(id, attachment.name, attachmentId)
+            if (demo) registerDemo.run(id)
             return true
           })
           return created ? { id, attachmentId } : undefined

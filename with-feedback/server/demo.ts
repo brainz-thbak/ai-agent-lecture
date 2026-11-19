@@ -1,3 +1,4 @@
+import { randomInt, randomUUID } from 'node:crypto'
 import type { DatabaseSync } from 'node:sqlite'
 import { transaction } from './database.ts'
 import { isFileId } from './files.ts'
@@ -6,14 +7,12 @@ import type { openIncidents } from './incidents.ts'
 import type { openReports } from './reports.ts'
 
 const examples = [
-  { id: 'INC-DEMO-0415', title: '백업 작업 지연', name: 'backup-worker.log', service: 'backup-worker', message: 'snapshot queue exceeded threshold', closed: true },
-  { id: 'INC-DEMO-0416', title: '인증 토큰 갱신 실패', name: 'auth-refresh.log', service: 'auth-service', message: 'refresh token endpoint returned 503', closed: false },
-  { id: 'INC-DEMO-0417', title: '정산 배치 재시도', name: 'settlement-batch.log', service: 'settlement', message: 'batch attempt exceeded timeout', closed: true },
-  { id: 'INC-DEMO-0418', title: '결제 API 응답 지연', name: 'payments-gateway.log', service: 'payments-api', message: 'upstream response timeout after 3000ms', closed: false },
+  { title: '정산 배치 재시도', name: 'settlement-batch.log', service: 'settlement', message: 'batch attempt exceeded timeout', closed: true, maxDaysAgo: 13 },
+  { title: '인증 토큰 갱신 실패', name: 'auth-refresh.log', service: 'auth-service', message: 'refresh token endpoint returned 503', closed: false },
+  { title: '백업 작업 지연', name: 'backup-worker.log', service: 'backup-worker', message: 'snapshot queue exceeded threshold', closed: true, minDaysAgo: 14 },
+  { title: '결제 API 응답 지연', name: 'payments-gateway.log', service: 'payments-api', message: 'upstream response timeout after 3000ms', closed: false },
 ]
-const exampleReport = { id: 'AUD-DEMO-0114', incidentId: 'INC-DEMO-0417' }
-const exampleIds = examples.map(({ id }) => id)
-const idParameters = exampleIds.map(() => '?').join(', ')
+const legacyExampleIds = ['INC-DEMO-0415', 'INC-DEMO-0416', 'INC-DEMO-0417', 'INC-DEMO-0418']
 
 type DemoStores = {
   database: DatabaseSync
@@ -23,14 +22,19 @@ type DemoStores = {
 }
 
 export function openDemo({ database, files, incidents, reports }: DemoStores) {
-  const selectCandidates = database.prepare(`
-    SELECT file_id FROM incident_attachments WHERE incident_id IN (${idParameters})
+  const exampleIds = `
+    SELECT id FROM demo_incidents
     UNION
-    SELECT file_id FROM reports WHERE source_incident_id IN (${idParameters})
+    SELECT id FROM incidents WHERE id IN (${legacyExampleIds.map(() => '?').join(', ')})
+  `
+  const selectCandidates = database.prepare(`
+    SELECT file_id FROM incident_attachments WHERE incident_id IN (${exampleIds})
+    UNION
+    SELECT file_id FROM reports WHERE source_incident_id IN (${exampleIds})
   `)
-  const deleteReports = database.prepare(`DELETE FROM reports WHERE source_incident_id IN (${idParameters})`)
-  const deleteAttachments = database.prepare(`DELETE FROM incident_attachments WHERE incident_id IN (${idParameters})`)
-  const deleteIncidents = database.prepare(`DELETE FROM incidents WHERE id IN (${idParameters})`)
+  const deleteReports = database.prepare(`DELETE FROM reports WHERE source_incident_id IN (${exampleIds})`)
+  const deleteAttachments = database.prepare(`DELETE FROM incident_attachments WHERE incident_id IN (${exampleIds})`)
+  const deleteIncidents = database.prepare(`DELETE FROM incidents WHERE id IN (${exampleIds})`)
   const fileReferences = database.prepare(`
     SELECT 1 FROM incident_attachments WHERE file_id = ?
     UNION ALL
@@ -46,35 +50,42 @@ export function openDemo({ database, files, incidents, reports }: DemoStores) {
   let busy = false
 
   async function seed() {
-    const generatedAt = new Date().toISOString()
-    for (const { id, title, name, service, message, closed } of examples) {
-      await incidents.create({
+    const count = randomInt(5, 16)
+    const now = new Date()
+    for (let index = 0; index < count; index += 1) {
+      const { title, name, service, message, closed, minDaysAgo = 0, maxDaysAgo = 30 } = examples[index % examples.length]
+      const date = new Date(now)
+      date.setDate(date.getDate() - randomInt(minDaysAgo, maxDaysAgo + 1))
+      const createdAt = date.toISOString()
+      const id = `INC-DEMO-${randomUUID()}`
+      const created = await incidents.create({
         id,
         title,
-        createdAt: generatedAt,
-        closedAt: closed ? generatedAt : undefined,
+        createdAt,
+        closedAt: closed ? createdAt : undefined,
+        demo: true,
         attachment: {
           name,
           content: [
-            `${generatedAt}  INFO   ${service}  request started`,
-            `${generatedAt}  WARN   ${service}  retry scheduled`,
-            `${generatedAt}  ERROR  ${service}  ${message}`,
+            `${createdAt}  INFO   ${service}  request started`,
+            `${createdAt}  WARN   ${service}  retry scheduled`,
+            `${createdAt}  ERROR  ${service}  ${message}`,
             '',
           ].join('\n'),
         },
       })
+      if (index === 0 && created) {
+        reports.create({ id: `AUD-DEMO-${randomUUID()}`, incidentId: id, attachmentId: created.attachmentId })
+      }
     }
-
-    const source = incidents.get(exampleReport.incidentId)?.attachment
-    if (source) reports.create({ ...exampleReport, attachmentId: source.id })
   }
 
   async function reset() {
     transaction(database, () => {
-      const candidates = selectCandidates.all(...exampleIds, ...exampleIds)
-      deleteReports.run(...exampleIds)
-      deleteAttachments.run(...exampleIds)
-      deleteIncidents.run(...exampleIds)
+      const candidates = selectCandidates.all(...legacyExampleIds, ...legacyExampleIds)
+      deleteReports.run(...legacyExampleIds)
+      deleteAttachments.run(...legacyExampleIds)
+      deleteIncidents.run(...legacyExampleIds)
 
       for (const { file_id: fileId } of candidates) {
         if (!isFileId(fileId)) throw new Error('Invalid demo file ID')

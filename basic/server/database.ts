@@ -76,4 +76,10 @@ export function initializeDatabase(database: DatabaseSync) {
 
     database.exec('PRAGMA user_version = 2')
   })
+
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS demo_incidents (
+      id TEXT PRIMARY KEY REFERENCES incidents (id) ON DELETE CASCADE
+    ) STRICT;
+  `)
 }

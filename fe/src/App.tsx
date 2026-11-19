@@ -19,12 +19,12 @@ type Action = 'refresh' | 'seed' | 'reset' | 'close'
 const time = new Intl.DateTimeFormat('ko-KR', { timeStyle: 'medium', hourCycle: 'h23' })
 const navigation = [
   { to: paths.overview, label: '대시보드', icon: SquaresFourIcon },
-  { to: paths.incidents, label: '운영 알림', icon: BellSimpleRingingIcon },
+  { to: paths.incidents, label: '운영 이벤트', icon: BellSimpleRingingIcon },
   { to: paths.reports, label: '감사 보고서', icon: ClipboardTextIcon },
 ]
 const pageTitles: Record<View, string> = {
   overview: '운영 대시보드',
-  incidents: '운영 알림',
+  incidents: '운영 이벤트',
   reports: '감사 보고서',
   'not-found': '페이지를 찾을 수 없습니다.',
 }
@@ -69,15 +69,15 @@ function Collection({ view, workspace, busy, close, createReport }: {
   }, [location.key, location.state, navigationType])
 
   return <div className="dashboard-grid">
-    <section className="panel list-panel" aria-label={isIncidents ? '알림 목록' : '감사 보고서 목록'}>
-      <div className="list-heading"><div className="flex min-w-0 items-center gap-2"><h2>{isIncidents ? '알림 목록' : '보고서 목록'}</h2><span className="list-count">{isIncidents ? incidents.length : reports.length}</span></div>
-        <label className="search"><MagnifyingGlassIcon size={17} /><input type="search" aria-label={isIncidents ? '알림 검색' : '보고서 검색'} placeholder={isIncidents ? '제목, ID, 파일명 검색' : '보고서 ID, 파일명 검색'} value={query} onChange={(event) => setQuery(event.target.value)} /></label>
+    <section className="panel list-panel" aria-label={isIncidents ? '이벤트 목록' : '감사 보고서 목록'}>
+      <div className="list-heading"><div className="flex min-w-0 items-center gap-2"><h2>{isIncidents ? '이벤트 목록' : '보고서 목록'}</h2><span className="list-count">{isIncidents ? incidents.length : reports.length}</span></div>
+        <label className="search"><MagnifyingGlassIcon size={17} /><input type="search" aria-label={isIncidents ? '이벤트 검색' : '보고서 검색'} placeholder={isIncidents ? '제목, ID, 파일명 검색' : '보고서 ID, 파일명 검색'} value={query} onChange={(event) => setQuery(event.target.value)} /></label>
       </div>
-      {isIncidents && <div className="filters" aria-label="알림 상태 필터">
+      {isIncidents && <div className="filters" aria-label="이벤트 상태 필터">
         {(['all', 'open', 'closed'] satisfies Filter[]).map((option) => <button type="button" key={option} className={filter === option ? 'active' : ''} aria-pressed={filter === option} onClick={() => setFilter(option)}>{option === 'all' ? '전체' : option === 'open' ? '미처리' : '처리 완료'}</button>)}
       </div>}
       {isIncidents && incidents.length > 0 && <>
-        <div className="record-labels incident-row" aria-hidden="true"><span>알림</span><span>첨부파일</span><span>상태</span></div>
+        <div className="record-labels incident-row" aria-hidden="true"><span>이벤트</span><span>첨부파일</span><span>상태</span></div>
         <div className="records">{incidents.map((item) => <Link className="record incident-row" key={item.id}
           to={recordPath('incidents', item.id)} state={scrollToRecord} aria-current={incident?.id === item.id ? 'page' : undefined}>
           <span className="min-w-0"><span className="record-title" title={item.title}>{item.title}</span><span className="record-id">{item.id}</span></span>
@@ -93,8 +93,8 @@ function Collection({ view, workspace, busy, close, createReport }: {
         </Link>)}</div>
       </>}
       {(isIncidents ? incidents.length === 0 : reports.length === 0) && <EmptyState
-        title={search || filter !== 'all' ? '조건에 맞는 항목이 없습니다.' : isIncidents ? '등록된 알림이 없습니다.' : '감사 보고서가 없습니다.'}
-        description={search || filter !== 'all' ? '다른 검색어나 상태를 선택해 보세요.' : isIncidents ? '예제 데이터를 추가해 알림을 확인하세요.' : '운영 알림에서 첨부파일을 선택해 보고서를 만드세요.'}
+        title={search || filter !== 'all' ? '조건에 맞는 항목이 없습니다.' : isIncidents ? '등록된 이벤트가 없습니다.' : '감사 보고서가 없습니다.'}
+        description={search || filter !== 'all' ? '다른 검색어나 상태를 선택해 보세요.' : isIncidents ? '예제 데이터를 추가해 이벤트를 확인하세요.' : '운영 이벤트에서 첨부파일을 선택해 보고서를 만드세요.'}
       />}
     </section>
 
@@ -106,7 +106,7 @@ function Collection({ view, workspace, busy, close, createReport }: {
     {!hasRecord && <div className={`panel detail-empty${id === undefined ? ' detail-placeholder' : ''}`}>
       {id === undefined
         ? <EmptyState title="상세 정보" description="목록에서 항목을 선택하면 여기에 표시됩니다." />
-        : <EmptyState title={isIncidents ? '알림을 찾을 수 없습니다.' : '감사 보고서를 찾을 수 없습니다.'}
+        : <EmptyState title={isIncidents ? '이벤트를 찾을 수 없습니다.' : '감사 보고서를 찾을 수 없습니다.'}
           description="목록에서 조회할 항목을 선택해 주세요." />}
     </div>}
   </div>
@@ -164,7 +164,7 @@ export default function App() {
         <h1>{pageTitles[view]}</h1>
         {view !== 'not-found' && <div className="topbar-actions">
           <button type="button" className="icon-button refresh-button" aria-label="새로고침" title="새로고침" disabled={Boolean(busy)} onClick={() => void refreshOnDemand()}><ArrowClockwiseIcon size={17} /></button>
-          <button type="button" className="button secondary" title="예제 알림과 연결된 보고서 초기화" disabled={!workspace || Boolean(busy)} onClick={() => void run('reset', resetExamples, '예제 데이터를 초기화했습니다.')}>{busy === 'reset' ? '초기화 중…' : '예제 초기화'}</button>
+          <button type="button" className="button secondary" title="예제 이벤트와 연결된 보고서 초기화" disabled={!workspace || Boolean(busy)} onClick={() => void run('reset', resetExamples, '예제 데이터를 초기화했습니다.')}>{busy === 'reset' ? '초기화 중…' : '예제 초기화'}</button>
           <button type="button" className="button primary" disabled={!workspace || Boolean(busy)} onClick={() => void run('seed', seedExamples, '예제 데이터를 준비했습니다.')}><PlusIcon size={16} aria-hidden="true" />{busy === 'seed' ? '추가 중…' : '예제 데이터 추가'}</button>
         </div>}
       </header>
@@ -182,7 +182,7 @@ export default function App() {
         {load.kind === 'ready' && (view === 'overview'
           ? <Dashboard workspace={load.workspace} refreshedAt={load.refreshedAt} />
           : <Collection view={view} workspace={load.workspace} busy={Boolean(busy)}
-              close={(id) => void run('close', () => closeIncident(id), '알림을 처리 완료했습니다.')}
+              close={(id) => void run('close', () => closeIncident(id), '이벤트를 처리 완료했습니다.')}
               createReport={setReportSourceSelection} />)}
       </>}
     </WorkspacePage>
