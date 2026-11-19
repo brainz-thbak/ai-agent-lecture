@@ -75,7 +75,8 @@ async function upload(request, response, space) {
     return;
   }
 
-  json(response, 201, { id: catalog.put(space, name.originalName, content) });
+  const { id, created } = catalog.put(space, name.originalName, content);
+  json(response, created ? 201 : 200, { id });
 }
 
 async function download(request, response, file) {

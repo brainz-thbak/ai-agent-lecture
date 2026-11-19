@@ -42,9 +42,9 @@ export function createFileStore(origin: string, space: string) {
     put({ name, content }: AttachmentInput): Promise<FileId> {
       return request('files', async (response) => {
         await checkResponse(response)
-        if (response.status !== 201) {
+        if (response.status !== 201 && response.status !== 200) {
           await response.body?.cancel()
-          throw new Error('File store did not create a new file')
+          throw new Error('File store did not store the file')
         }
         const result: unknown = await response.json()
         if (typeof result !== 'object' || result === null || !('id' in result)

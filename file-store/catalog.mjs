@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { lstatSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -88,6 +88,7 @@ export function openCatalog(directory) {
   });
 
   return {
+    // 같은 space 에서 같은 내용은 같은 ID 를 쓴다. created 는 이번 업로드로 새 파일을 만들었는지 나타낸다.
     put(space, originalName, content) {
       const spaceDirectory = join(directory, space);
       mkdirSync(spaceDirectory, { recursive: true });
@@ -95,46 +96,18 @@ export function openCatalog(directory) {
         throw new Error('The storage space must be a directory');
       }
 
-      for (;;) {
-        const id = randomBytes(32).toString('hex');
-        const path = `${space}/${id}`;
-        const target = join(directory, path);
-        if (lstatSync(target, { throwIfNoEntry: false })) {
-          continue;
+      const id = createHash('sha256').update(content).digest('hex');
+      const path = `${space}/${id}`;
+      const target = join(directory, path);
+      return transaction(() => {
+        if (findFile.get(space, id, 'ready')) {
+          return { id, created: false };
         }
-        const uploadedAt = new Date().toISOString();
-        if (!insertFile.run(space, id, originalName, path, content.length, uploadedAt, 'pending').changes) {
-          continue;
-        }
-
-        try {
-          const published = transaction(() => {
-            if (!findFile.get(space, id, 'pending')) {
-              return false;
-            }
-            writeFileSync(target, content, { flag: 'wx', flush: true });
-            setState.run('ready', space, id, 'pending');
-            return true;
-          });
-          if (published) {
-            return id;
-          }
-        } catch (error) {
-          transaction(() => {
-            const file = findFile.get(space, id, 'pending');
-            if (file) {
-              if (error.code === 'EEXIST') {
-                deleteFile.run(space, id);
-              } else {
-                removeFile(space, file);
-              }
-            }
-          });
-          if (error.code !== 'EEXIST') {
-            throw error;
-          }
-        }
-      }
+        deleteFile.run(space, id);
+        writeFileSync(target, content, { flush: true });
+        insertFile.run(space, id, originalName, path, content.length, new Date().toISOString(), 'ready');
+        return { id, created: true };
+      });
     },
 
     get(space, id) {

@@ -1,0 +1,8 @@
+{
+  "topics": {
+    "attachment.stored": [],
+    "incident.closed": [],
+    "report.created": [],
+    "export.completed": []
+  }
+}
