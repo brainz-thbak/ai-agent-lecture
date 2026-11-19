@@ -1,5 +1,4 @@
 packages:
-  - basic
-  - with-feedback
+  - app
   - file-store
   - fe

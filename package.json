@@ -6,8 +6,7 @@
     "node": ">=24"
   },
   "scripts": {
-    "dev": "turbo run dev --filter=fe --filter=basic --filter=file-store",
-    "dev:feedback": "turbo run dev --filter=fe --filter=with-feedback --filter=file-store",
+    "dev": "turbo run dev --filter=fe --filter=app --filter=file-store",
     "build": "turbo run build"
   },
   "devDependencies": {

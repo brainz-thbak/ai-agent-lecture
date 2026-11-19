@@ -1,4 +1,4 @@
-# basic
+# app
 
 - Node.js 24 이상을 사용한다.
 - `pnpm dev`로 개발 서버를 실행한다.

@@ -12,7 +12,7 @@ importers:
         specifier: 2.11.11
         version: 2.11.11
 
-  basic:
+  app:
     devDependencies:
       '@types/node':
         specifier: ^24.19.2
@@ -68,15 +68,6 @@ importers:
         version: 8.3.8(@types/node@24.19.2)(jiti@2.7.0)
 
   file-store: {}
-
-  with-feedback:
-    devDependencies:
-      '@types/node':
-        specifier: ^24.19.2
-        version: 24.19.2
-      typescript:
-        specifier: ~7.0.2
-        version: 7.0.2
 
 packages:
 

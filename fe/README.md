@@ -33,10 +33,6 @@ __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS=demo.example.com pnpm dev
 
 Vite는 `/api` 요청을 `http://localhost:8080`으로 전달합니다. 백엔드는 `http://localhost:6006`의 `file-store`에 첨부파일을 저장합니다.
 
-`pnpm dev`는 `basic`을 시작합니다. `with-feedback`을 시연하려면 실행 중인 스택을 종료한 뒤 저장소 루트에서 아래 명령을 실행합니다. 두 백엔드는 같은 `8080` 포트를 사용합니다.
-
-```sh
-pnpm dev:feedback
-```
+`pnpm dev`는 `app`, `fe`, `file-store`를 함께 시작합니다.
 
 `pnpm --filter fe build`는 `fe/dist`에 정적 파일을 만듭니다. 개발용 FE를 종료한 뒤 `pnpm --filter fe preview`를 실행하면 `3000`에서 같은 API 프록시로 빌드 결과를 확인할 수 있습니다.
