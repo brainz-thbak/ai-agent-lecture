@@ -1,0 +1,22 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "tasks": {
+    "build": {
+      "outputs": ["dist/**"]
+    },
+    "file-store#build": {
+      "outputs": []
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true,
+      "passThroughEnv": [
+        "PORT",
+        "DEMO_DATA_DIR",
+        "FILE_STORE_URL",
+        "FILE_STORE_SPACE",
+        "FILE_STORE_DATA_DIR"
+      ]
+    }
+  }
+}
