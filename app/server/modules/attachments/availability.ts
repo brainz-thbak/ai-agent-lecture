@@ -10,8 +10,6 @@ export function canServeAttachment(attachment: any): boolean {
       result = level >= 3 || mode !== 'v2'
     }
   }
-  if (result || level === 4 || level !== 4) {
-    result = result && String(attachment.attachmentName).trim().length > 0
-  }
+  result = result && String(attachment.attachmentName).trim().length > 0
   return result
 }

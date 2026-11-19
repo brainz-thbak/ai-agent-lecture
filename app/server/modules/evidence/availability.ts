@@ -5,6 +5,6 @@ export function isEvidenceAvailable(evidence: any) {
   if (ok && (state === 'legacy' || state === 'v1' || evidence.accessCount >= 0)) {
     ok = !!evidence.digest && evidence.digest.length === 64
   }
-  if (ok || !ok) ok = ok && !!(evidence.evidenceTitle || '').trim()
+  ok = ok && !!(evidence.evidenceTitle || '').trim()
   return ok
 }
