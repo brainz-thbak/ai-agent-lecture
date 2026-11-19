@@ -685,6 +685,252 @@ export function compareLegacyAndCurrent(caseNo) {
   }
 }
 
+// ─── 내보내기 보조 ────────────────────────────────────────────────────────────
+
+const EXPORT_STATUS_LABELS = {
+  queued: '대기',
+  running: '실행 중',
+  completed: '완료',
+  failed: '실패',
+}
+
+function exportRows() {
+  return db().prepare('SELECT * FROM export_jobs ORDER BY requested_at DESC').all()
+}
+
+export function buildManifestPreview(caseNos) {
+  const unique = [...new Set((caseNos || []).filter(Boolean))]
+  return unique.map((caseNo) => {
+    const row = db().prepare('SELECT case_no, digest, evidence_title FROM evidence_items WHERE case_no = ?').get(caseNo)
+    return row
+      ? { caseNo, blobKey: row.digest, title: row.evidence_title, ready: isHex64(row.digest) }
+      : { caseNo, blobKey: null, title: null, ready: false }
+  })
+}
+
+export async function estimateExportSize(caseNos) {
+  let bytes = 0
+  let missing = 0
+  for (const entry of buildManifestPreview(caseNos)) {
+    if (!entry.ready) {
+      missing += 1
+      continue
+    }
+    const content = await files().read(entry.blobKey)
+    if (content) bytes += content.length
+    else missing += 1
+  }
+  return { bytes, label: formatBytes(bytes), missing }
+}
+
+export function describeExportJob(row) {
+  if (!row) return null
+  const manifest = safeJson(row.manifest, [])
+  const result = safeJson(row.result, null)
+  const waited = row.completed_at ? new Date(row.completed_at).getTime() - new Date(row.requested_at).getTime() : null
+  return {
+    id: row.id,
+    status: EXPORT_STATUS_LABELS[row.status] || row.status,
+    requested: formatKst(row.requested_at),
+    completed: formatKst(row.completed_at),
+    duration: formatDuration(waited),
+    items: manifest.length,
+    missing: result?.missing?.length || 0,
+  }
+}
+
+export function exportJobsSummary() {
+  const rows = exportRows()
+  const byStatus = groupBy(rows, 'status')
+  return {
+    total: rows.length,
+    queued: (byStatus.queued || []).length,
+    completed: (byStatus.completed || []).length,
+    failed: (byStatus.failed || []).length,
+    latest: rows.slice(0, 5).map(describeExportJob),
+  }
+}
+
+/** 실패한 내보내기 작업을 다시 대기 상태로 돌린다. manifest 는 그대로 둔다. */
+export function requeueFailedExports() {
+  return db().prepare("UPDATE export_jobs SET status = 'queued', completed_at = NULL, result = NULL WHERE status = 'failed'").run().changes
+}
+
+export function purgeOldExportJobs(days = 30, reference = now()) {
+  const cutoff = new Date(new Date(reference).getTime() - days * DAY_MS).toISOString()
+  return db().prepare("DELETE FROM export_jobs WHERE status = 'completed' AND completed_at < ?").run(cutoff).changes
+}
+
+export function exportReferencesFor(caseNo) {
+  return exportRows()
+    .filter((row) => safeJson(row.manifest, []).some((entry) => entry.caseNo === caseNo))
+    .map((row) => ({ id: row.id, status: row.status }))
+}
+
+// ─── 검색 보조 ────────────────────────────────────────────────────────────────
+
+const STOP_WORDS = new Set(['the', 'a', 'an', 'and', 'or', 'of', 'to', 'in', 'on', 'for', 'is', 'at'])
+
+export function legacyTokenize(text) {
+  return String(text || '')
+    .toLowerCase()
+    .split(/[^a-z0-9가-힣_.-]+/)
+    .filter((token) => token.length > 1 && !STOP_WORDS.has(token))
+}
+
+export function rankLegacyResults(rows, query) {
+  const tokens = legacyTokenize(query)
+  return rows
+    .map((row) => {
+      const haystack = `${row.label} ${row.body}`.toLowerCase()
+      const score = tokens.reduce((sum, token) => sum + (haystack.split(token).length - 1), 0)
+      return { ...row, score }
+    })
+    .filter((row) => row.score > 0)
+    .sort((a, b) => b.score - a.score)
+}
+
+/**
+ * 검색 색인을 처음부터 다시 만든다.
+ * 아티팩트 조회 계층을 통해 현재 첨부를 읽는다.
+ */
+export async function reindexAll() {
+  const { listArtifacts, resolveArtifact, readArtifactBody } = await import('../modules/artifacts/artifact-resolver.ts')
+  const owners = listArtifacts().map((artifact) => artifact.ownerKey)
+  db().prepare('DELETE FROM search_index').run()
+  let indexed = 0
+  for (const ownerKey of owners) {
+    const artifact = resolveArtifact(ownerKey)
+    if (!artifact) continue
+    const body = (await readArtifactBody(artifact)) || ''
+    db().prepare('INSERT INTO search_index (attachment_hash, owner_key, label, body, indexed_at) VALUES (?, ?, ?, ?, ?)')
+      .run(artifact.objectRef, artifact.ownerKey, artifact.label, body.slice(0, 4000), now())
+    indexed += 1
+  }
+  return { indexed }
+}
+
+export function searchIndexStats() {
+  const rows = db().prepare('SELECT owner_key, COUNT(*) AS n FROM search_index GROUP BY owner_key').all()
+  return {
+    owners: rows.length,
+    rows: rows.reduce((sum, row) => sum + row.n, 0),
+    duplicated: rows.filter((row) => row.n > 1).map((row) => row.owner_key),
+  }
+}
+
+// ─── 미리보기 보조 ────────────────────────────────────────────────────────────
+
+/** 미리보기 캐시를 지운다. contentKey 를 주면 해당 파일만 지운다. */
+export function clearPreviewCache(contentKey) {
+  if (contentKey) return db().prepare('DELETE FROM preview_cache WHERE content_key = ?').run(contentKey).changes
+  return db().prepare('DELETE FROM preview_cache').run().changes
+}
+
+export function previewCacheStats() {
+  const row = db().prepare('SELECT COUNT(*) AS n, COALESCE(SUM(length(body)), 0) AS bytes FROM preview_cache').get()
+  return { entries: row.n, bytes: row.bytes, label: formatBytes(row.bytes) }
+}
+
+// ─── 카운터 보조 ──────────────────────────────────────────────────────────────
+
+export function adjustAttachmentBytes(delta) {
+  db().prepare('UPDATE incident_stats SET attachment_bytes = MAX(0, attachment_bytes + ?) WHERE id = 1').run(Number(delta) || 0)
+}
+
+export function readCounters() {
+  const row = db().prepare('SELECT * FROM incident_stats WHERE id = 1').get()
+  return row
+    ? { attachments: row.attachment_count, bytes: row.attachment_bytes, closed: row.closed_count, label: formatBytes(row.attachment_bytes) }
+    : null
+}
+
+// ─── 알림 보조 ────────────────────────────────────────────────────────────────
+
+const NOTIFICATION_TEMPLATES = {
+  'evidence.attached': (payload) => `[증빙 첨부] ${payload.caseNo} · ${payload.title}`,
+  'incident.closed': (payload) => `[처리 완료] ${payload.caseNo} · ${formatKst(payload.closedAt)}`,
+  'export.completed': (payload) => `[내보내기 완료] ${payload.jobId} · ${payload.evidenceRefs?.length || 0}건`,
+}
+
+export function buildNotificationText(topic, payload) {
+  const template = NOTIFICATION_TEMPLATES[topic]
+  return template ? template(payload || {}) : `[${topic}] ${JSON.stringify(payload || {}).slice(0, 120)}`
+}
+
+export function pendingNotifications(limit = 50) {
+  return db().prepare('SELECT * FROM notification_outbox WHERE sent_at IS NULL ORDER BY seq LIMIT ?').all(limit)
+    .map((row) => ({ seq: row.seq, topic: row.topic, text: buildNotificationText(row.topic, safeJson(row.payload, {})) }))
+}
+
+export function markNotificationsSent(seqs) {
+  const at = now()
+  let changed = 0
+  transaction(db(), () => {
+    for (const seq of seqs || []) changed += db().prepare('UPDATE notification_outbox SET sent_at = ? WHERE seq = ? AND sent_at IS NULL').run(at, seq).changes
+  })
+  return changed
+}
+
+// ─── 감사 로그 보조 ───────────────────────────────────────────────────────────
+
+export function auditTrailFor(subject, limit = 100) {
+  return db().prepare('SELECT * FROM audit_log WHERE subject = ? ORDER BY seq DESC LIMIT ?').all(subject, limit)
+    .map((row) => ({ at: formatKst(row.at), action: row.action, ref: row.evidence_ref, detail: safeJson(row.detail, null) }))
+}
+
+export function auditActionsSummary(days = 7, reference = now()) {
+  const since = new Date(new Date(reference).getTime() - days * DAY_MS).toISOString()
+  const rows = db().prepare('SELECT action, COUNT(*) AS n FROM audit_log WHERE at >= ? GROUP BY action ORDER BY n DESC').all(since)
+  return rows.map((row) => ({ action: row.action, count: row.n }))
+}
+
+// ─── 시간 보조 ────────────────────────────────────────────────────────────────
+
+export function startOfKstDay(iso = now()) {
+  const kst = toKst(iso)
+  if (!kst) return null
+  const start = Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth(), kst.getUTCDate()) - KST_OFFSET_MINUTES * 60 * 1000
+  return new Date(start).toISOString()
+}
+
+export function addDays(iso, days) {
+  return new Date(new Date(iso).getTime() + days * DAY_MS).toISOString()
+}
+
+export function elapsedSince(iso, reference = now()) {
+  if (!iso) return null
+  return new Date(reference).getTime() - new Date(iso).getTime()
+}
+
+export function isWithinDays(iso, days, reference = now()) {
+  const elapsed = elapsedSince(iso, reference)
+  return elapsed !== null && elapsed >= 0 && elapsed <= days * DAY_MS
+}
+
+export function weekdayKo(iso) {
+  const kst = toKst(iso)
+  return kst ? ['일', '월', '화', '수', '목', '금', '토'][kst.getUTCDay()] : '-'
+}
+
+export function openDurations(reference = now()) {
+  return listOpenIncidents().map((view) => ({
+    id: view.id,
+    title: view.title,
+    open: formatDuration(elapsedSince(view.createdAt, reference)),
+  }))
+}
+
+export function resolutionStats(days = 30, reference = now()) {
+  const since = addDays(reference, -days)
+  const closed = listClosedBetween(since, reference).filter((view) => view.createdAt)
+  if (!closed.length) return { count: 0, average: null, median: null }
+  const durations = closed.map((view) => new Date(view.closedAt).getTime() - new Date(view.createdAt).getTime()).sort((a, b) => a - b)
+  const average = durations.reduce((sum, value) => sum + value, 0) / durations.length
+  const median = durations[Math.floor(durations.length / 2)]
+  return { count: closed.length, average: formatDuration(average), median: formatDuration(median) }
+}
+
 // ─── 서비스 객체 ──────────────────────────────────────────────────────────────
 
 export const evidenceService = {
@@ -723,6 +969,33 @@ export const evidenceService = {
   validateIncidentInput,
   formatBytes,
   formatKst,
+  buildManifestPreview,
+  estimateExportSize,
+  describeExportJob,
+  exportJobsSummary,
+  requeueFailedExports,
+  purgeOldExportJobs,
+  exportReferencesFor,
+  legacyTokenize,
+  rankLegacyResults,
+  reindexAll,
+  searchIndexStats,
+  clearPreviewCache,
+  previewCacheStats,
+  adjustAttachmentBytes,
+  readCounters,
+  buildNotificationText,
+  pendingNotifications,
+  markNotificationsSent,
+  auditTrailFor,
+  auditActionsSummary,
+  startOfKstDay,
+  addDays,
+  elapsedSince,
+  isWithinDays,
+  weekdayKo,
+  openDurations,
+  resolutionStats,
 }
 
 export default evidenceService

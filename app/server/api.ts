@@ -4,9 +4,15 @@ import { HttpError, sendJson } from './core/http.ts'
 import { initializeDatabase } from './database.ts'
 import { FileStoreError } from './files.ts'
 import { attachmentRoutes } from './modules/attachments/routes.ts'
+import { auditLogRoutes } from './modules/audit-log/routes.ts'
 import { legacyEvidenceRoutes } from './modules/evidence/legacy-routes.ts'
+import { exportRoutes } from './modules/export/routes.ts'
 import { incidentRoutes } from './modules/incidents/routes.ts'
+import { notificationRoutes } from './modules/notifications/routes.ts'
+import { previewRoutes } from './modules/preview/routes.ts'
 import { reportRoutes } from './modules/reports/routes.ts'
+import { searchRoutes } from './modules/search/routes.ts'
+import { statsRoutes } from './modules/stats/routes.ts'
 import { systemRoutes } from './modules/system/routes.ts'
 
 // 위에서부터 순서대로 비교한다. 먼저 맞는 라우트가 요청을 처리한다.
@@ -14,7 +20,13 @@ const routes: any[] = [
   ...systemRoutes,
   ...incidentRoutes,
   ...attachmentRoutes,
+  ...previewRoutes,
   ...reportRoutes,
+  ...exportRoutes,
+  ...searchRoutes,
+  ...statsRoutes,
+  ...auditLogRoutes,
+  ...notificationRoutes,
   ...legacyEvidenceRoutes,
 ]
 

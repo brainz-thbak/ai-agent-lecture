@@ -1,8 +1,22 @@
 {
   "topics": {
-    "attachment.stored": [],
-    "incident.closed": [],
-    "report.created": [],
-    "export.completed": []
+    "attachment.stored": [
+      "modules/search/indexer.ts#indexArtifact",
+      "modules/stats/counters.ts#bumpAttachment",
+      "modules/preview/preview-cache.ts#warm",
+      "modules/audit-log/recorder.ts#recordEvidence",
+      "modules/notifications/outbox.ts#enqueueEvidence"
+    ],
+    "incident.closed": [
+      "modules/stats/counters.ts#bumpClosed",
+      "modules/notifications/outbox.ts#enqueueClosed"
+    ],
+    "report.created": [
+      "modules/audit-log/recorder.ts#recordReport"
+    ],
+    "export.completed": [
+      "modules/audit-log/recorder.ts#recordExport",
+      "modules/notifications/outbox.ts#enqueueExport"
+    ]
   }
 }

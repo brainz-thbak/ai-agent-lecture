@@ -18,7 +18,7 @@ const files = createFileStore(process.env.FILE_STORE_URL ?? 'http://localhost:60
 mkdirSync(directory, { recursive: true })
 const database = new DatabaseSync(join(directory, 'metadata.sqlite'))
 const server = createServer(createApi(database, files))
-setContext({ database, files })
+setContext({ database, files, selfOrigin: `http://localhost:${port}` })
 await loadHandlers()
 
 server.listen(port, 'localhost', () => {
